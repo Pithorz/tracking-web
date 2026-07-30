@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0" />
+<title>PERIMETER — Live Camera HUD</title>
+<meta name="description" content="A premium, glassmorphic camera dashboard with an OSINT-inspired HUD interface." />
+<meta name="theme-color" content="#0a0e14" />
+
+<!-- Optional CDN type upgrade — app has a full system-font fallback and works fully offline -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===================== BOOT / CALIBRATION SEQUENCE ===================== -->
+<div id="boot-screen" class="boot-screen">
+  <div class="boot-mark">
+    <img src="assets/logo.svg" alt="" class="boot-logo" />
+    <div class="boot-ring"></div>
+  </div>
+  <h1 class="boot-title">PERIMETER</h1>
+  <p class="boot-sub">visual telemetry console</p>
+
+  <div class="boot-progress-track">
+    <div class="boot-progress-fill" id="boot-progress-fill"></div>
+  </div>
+  <p class="boot-status" id="boot-status">Initializing modules&hellip;</p>
+</div>
+
+<!-- ============================== APP SHELL ============================== -->
+<div id="app" class="app" hidden>
+
+  <!-- Ambient scanline / grain overlay for the whole shell -->
+  <div class="scanline-overlay" aria-hidden="true"></div>
+
+  <!-- ---------------------------- TOP BAR ---------------------------- -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo.svg" alt="" class="brand-mark" />
+      <div class="brand-text">
+        <span class="brand-name">PERIMETER</span>
+        <span class="brand-tag">visual telemetry console</span>
+      </div>
+    </div>
+
+    <div class="status-cluster">
+      <div class="status-pill" id="status-pill">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-label">STANDBY</span>
+      </div>
+      <button class="icon-btn" id="log-toggle" aria-label="Toggle session log" aria-expanded="false">
+        <img src="icons/log.svg" alt="" />
+      </button>
+    </div>
+  </header>
+
+  <!-- ---------------------------- MAIN GRID ---------------------------- -->
+  <main class="main-grid">
+
+    <!-- ======================= VIEWPORT / CAMERA ======================= -->
+    <section class="viewport-wrap">
+      <div class="viewport" id="viewport">
+
+        <video id="video" class="video-feed" playsinline autoplay muted></video>
+        <canvas id="capture-canvas" hidden></canvas>
+
+        <!-- Flash frame for capture feedback -->
+        <div class="flash-frame" id="flash-frame" aria-hidden="true"></div>
+
+        <!-- Idle / permission / error state -->
+        <div class="viewport-empty" id="viewport-empty">
+          <img src="icons/target.svg" alt="" class="empty-icon" />
+          <p class="empty-title" id="empty-title">Camera feed offline</p>
+          <p class="empty-sub" id="empty-sub">Grant camera access to begin live tracking analysis.</p>
+          <button class="btn-primary" id="retry-btn">Enable Camera</button>
+        </div>
+
+        <!-- HUD overlay drawn on top of the live video -->
+        <div class="hud-overlay" id="hud-overlay">
+
+          <!-- corner brackets -->
+          <span class="corner corner-tl"></span>
+          <span class="corner corner-tr"></span>
+          <span class="corner corner-bl"></span>
+          <span class="corner corner-br"></span>
+
+          <!-- rotating radar sweep -->
+          <div class="radar" aria-hidden="true">
+            <div class="radar-sweep"></div>
+            <div class="radar-ring radar-ring-1"></div>
+            <div class="radar-ring radar-ring-2"></div>
+          </div>
+
+          <!-- horizontal scan-line sweep -->
+          <div class="scan-line" id="scan-line" aria-hidden="true"></div>
+
+          <!-- optional composition grid -->
+          <div class="grid-overlay" id="grid-overlay" aria-hidden="true"></div>
+
+          <!-- crosshair center reticle -->
+          <div class="reticle" aria-hidden="true">
+            <span class="reticle-line reticle-h"></span>
+            <span class="reticle-line reticle-v"></span>
+          </div>
+
+          <!-- top readout strip -->
+          <div class="readout readout-top">
+            <span id="readout-res">— × —</span>
+            <span class="dot-sep">·</span>
+            <span id="readout-facing">FACING: —</span>
+            <span class="dot-sep">·</span>
+            <span id="readout-fps">— FPS</span>
+          </div>
+
+          <!-- bottom readout strip -->
+          <div class="readout readout-bottom">
+            <span id="readout-clock">00:00:00</span>
+            <span class="dot-sep">·</span>
+            <span id="readout-frame">FRAME 000000</span>
+          </div>
+
+          <!-- side telemetry ticks -->
+          <div class="tick-col tick-col-left" aria-hidden="true"></div>
+          <div class="tick-col tick-col-right" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <!-- ------------------------- CONTROL DOCK ------------------------- -->
+      <div class="control-dock">
+        <button class="dock-btn" id="grid-btn" aria-label="Toggle composition grid" title="Grid overlay">
+          <img src="icons/grid.svg" alt="" />
+        </button>
+
+        <button class="dock-btn" id="flash-btn" aria-label="Toggle torch" title="Torch" hidden>
+          <img src="icons/flash-off.svg" alt="" id="flash-icon" />
+        </button>
+
+        <button class="capture-btn" id="capture-btn" aria-label="Capture frame" title="Capture">
+          <img src="icons/capture.svg" alt="" />
+        </button>
+
+        <button class="dock-btn" id="switch-btn" aria-label="Switch camera" title="Switch camera">
+          <img src="icons/camera-switch.svg" alt="" />
+        </button>
+
+        <button class="dock-btn" id="camera-select-btn" aria-label="Select camera device" title="Select device" hidden>
+          <span class="dock-btn-text">DEV</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================= SESSION LOG PANEL ========================= -->
+    <aside class="log-panel" id="log-panel">
+      <div class="log-panel-head">
+        <span>SESSION LOG</span>
+        <button class="icon-btn small" id="log-close" aria-label="Close log">
+          <img src="icons/close.svg" alt="" />
+        </button>
+      </div>
+
+      <div class="log-metrics">
+        <div class="metric">
+          <span class="metric-label">Resolution</span>
+          <span class="metric-value" id="metric-res">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Active lens</span>
+          <span class="metric-value" id="metric-facing">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Devices found</span>
+          <span class="metric-value" id="metric-devices">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Frame rate</span>
+          <span class="metric-value" id="metric-fps">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Captures</span>
+          <span class="metric-value" id="metric-captures">0</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Session time</span>
+          <span class="metric-value" id="metric-uptime">00:00:00</span>
+        </div>
+      </div>
+
+      <div class="log-feed-wrap">
+        <div class="log-feed" id="log-feed"><!-- entries injected by script.js --></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ===================== CAPTURE REVIEW MODAL ===================== -->
+  <div class="review-modal" id="review-modal" hidden>
+    <div class="review-card">
+      <button class="icon-btn small review-close" id="review-close" aria-label="Close preview">
+        <img src="icons/close.svg" alt="" />
+      </button>
+      <img id="review-image" class="review-image" alt="Captured frame preview" />
+      <div class="review-actions">
+        <a class="btn-primary" id="review-download" download="perimeter-capture.png">
+          <img src="icons/download.svg" alt="" /> Save image
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TOAST / ERROR NOTICE ===================== -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
